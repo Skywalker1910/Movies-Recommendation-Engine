@@ -34,9 +34,9 @@ from .movie_service import movie_service
 logger = logging.getLogger(__name__)
 
 # ── Path resolution ───────────────────────────────────────────────────────────
-# Layout:  <workspace>/movie_recommendation_system/backend/app/ml_service.py
-#           parents[3] = <workspace root>
-_WORKSPACE = pathlib.Path(__file__).resolve().parents[3]
+# Layout:  <repo>/backend/app/ml_service.py
+#           parents[2] = <repo root>
+_WORKSPACE = pathlib.Path(__file__).resolve().parents[2]
 
 # Allow env-var override for containerised deployments (e.g. MODELS_DIR=/workspace/models)
 import os as _os
