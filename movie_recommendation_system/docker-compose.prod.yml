@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
+    volumes:
+      # Mount ML models and data (read-only) from host
+      - ../models:/workspace/models:ro
+      - ../data_science/processed:/workspace/data_science/processed:ro
+      - ../data/movielens:/workspace/data/movielens:ro
+      # Persistent SQLite database
+      - backend_data:/app/instance
+    environment:
+      FLASK_ENV: production
+    expose:
+      - "5000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Empty string = nginx proxies API calls to backend (same origin)
+        REACT_APP_API_URL: ""
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:

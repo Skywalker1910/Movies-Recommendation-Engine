@@ -1,4 +1,12 @@
-Flask
-pandas
-scikit-learn
-surprise
+# Install the application and data-science dependencies into the single
+# repository-local .venv environment.
+-r movie_recommendation_system/backend/requirements.txt
+
+# Notebook / analysis tooling
+ipykernel
+matplotlib
+seaborn
+
+# Required by notebooks 08 and 09; optional for the Flask backend.
+torch
+

@@ -1,0 +1,28 @@
+# Repository-local Python environment
+.venv/
+.venv-*/
+
+# Python caches and tooling
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local configuration and generated application state
+.env
+.env.production
+*.sqlite
+*.sqlite-journal
+instance/
+
+# Large data and model files — download or train locally, do not commit
+data/
+data_science/processed/
+models/
+
+# Frontend build artifacts
+movie_recommendation_system/frontend/build/
+movie_recommendation_system/frontend/node_modules/
+
