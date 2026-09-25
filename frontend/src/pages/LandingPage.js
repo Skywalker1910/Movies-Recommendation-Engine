@@ -13,7 +13,7 @@ export default function LandingPage() {
     <div className="landing page-enter">
       {/* Minimal top bar */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 48px' }}>
-        <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--red)' }}>CineMatch</span>
+        <span style={{ fontSize: 22, fontWeight: 900, color: 'var(--red)' }}>MRE</span>
         <Link to="/login" className="btn btn-outline btn-sm">Sign In</Link>
       </header>
 
@@ -25,7 +25,7 @@ export default function LandingPage() {
           film is one click <span className="accent">away.</span>
         </h1>
         <p className="landing-sub">
-          CineMatch uses a hybrid neural recommendation engine — FunkSVD, NeuMF, and TF-IDF
+          Movie Recommendation Engine uses a hybrid neural model — FunkSVD, NeuMF, and TF-IDF
           content signals — to surface movies you will actually love.
         </p>
         <div className="landing-cta">

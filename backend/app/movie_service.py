@@ -225,6 +225,9 @@ class MovieService:
         movie["poster_url"] = (
             f"{TMDB_IMAGE_URL}/w500{poster}" if poster else None
         )
+        movie["poster_thumb_url"] = (
+            f"{TMDB_IMAGE_URL}/w342{poster}" if poster else None
+        )
         movie["backdrop_url"] = (
             f"{TMDB_IMAGE_URL}/w1280{backdrop}" if backdrop else None
         )
