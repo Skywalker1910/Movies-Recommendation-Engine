@@ -24,8 +24,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd ~/movie-recommendation-engine
+            cd ~/Movies-Recommendation-Engine
             git pull origin main
-            cd movie_recommendation_system
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f

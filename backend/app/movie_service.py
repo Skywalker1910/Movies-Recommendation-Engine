@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Prefer the bundled backend data, then the repository data, then the Docker mount.
 _LOCAL_DATA = pathlib.Path(__file__).resolve().parent.parent / "data" / "movies-dataset"
-_PROJECT_DATA = pathlib.Path(__file__).resolve().parent.parent.parent.parent / "data" / "movielens"
+_PROJECT_DATA = pathlib.Path(__file__).resolve().parent.parent.parent / "data" / "movielens"
 _DOCKER_DATA = pathlib.Path("/workspace/data/movielens")
 
 if (_LOCAL_DATA / "movies_metadata.csv").exists():

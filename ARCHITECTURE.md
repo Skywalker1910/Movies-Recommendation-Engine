@@ -1,6 +1,6 @@
-# Movie Recommendation Web Application
+# Movie Recommendation Engine — Application Architecture
 
-This directory contains the application layer for the recommendation study. A Flask API serves movie metadata, user accounts, and model-backed recommendations. A React client provides registration, authentication, profile management, browsing, and recommendation views.
+This document describes the application layer for the recommendation study. A Flask API serves movie metadata, user accounts, and model-backed recommendations. A React client provides registration, authentication, profile management, browsing, and recommendation views.
 
 The application is a research prototype. It demonstrates how the notebook artifacts can be integrated into a usable system; it is not presented as a production deployment.
 
@@ -18,30 +18,30 @@ Flask application
     |
     |-- SQLite for local development
     |-- PostgreSQL through Docker Compose
-    |-- serialized artifacts from ../models
+    |-- serialized artifacts from ./models
 ```
 
 ## Directory structure
 
 ```text
-movie_recommendation_system/
-|-- backend/
-|   |-- app/
-|   |   |-- auth.py
-|   |   |-- user_routes.py
-|   |   |-- movie_routes.py
-|   |   |-- recommendation_routes.py
-|   |   |-- movie_service.py
-|   |   |-- ml_service.py
-|   |   `-- models.py
-|   |-- config.py
-|   |-- requirements.txt
-|   `-- run.py
-|-- frontend/
-|   |-- src/
-|   |-- package.json
-|   `-- package-lock.json
-`-- docker-compose.yml
+backend/
+|-- app/
+|   |-- auth.py
+|   |-- user_routes.py
+|   |-- movie_routes.py
+|   |-- recommendation_routes.py
+|   |-- movie_service.py
+|   |-- ml_service.py
+|   `-- models.py
+|-- config.py
+|-- requirements.txt
+`-- run.py
+frontend/
+|-- src/
+|-- package.json
+`-- package-lock.json
+docker-compose.yml
+docker-compose.prod.yml
 ```
 
 ## Local development
@@ -57,21 +57,20 @@ python -m pip install -r requirements.txt
 Create the backend configuration:
 
 ```powershell
-Copy-Item movie_recommendation_system\backend\.env.example `
-  movie_recommendation_system\backend\.env
+Copy-Item backend\.env.example backend\.env
 ```
 
 Set development secrets in `backend/.env`, then start the API:
 
 ```powershell
-Set-Location movie_recommendation_system\backend
+Set-Location backend
 python run.py
 ```
 
 Start the frontend in a second terminal:
 
 ```powershell
-Set-Location movie_recommendation_system\frontend
+Set-Location frontend
 npm install
 npm start
 ```
@@ -205,7 +204,6 @@ Local development uses SQLite. The database stores consumer users and isolated a
 Docker Compose starts PostgreSQL 15, the Flask API, and the React development server:
 
 ```powershell
-Set-Location movie_recommendation_system
 docker compose up --build
 ```
 

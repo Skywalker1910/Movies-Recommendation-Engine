@@ -111,12 +111,16 @@ The application also includes an isolated administration console at `/admin`. It
 ## Repository structure
 
 ```text
+backend/                      Flask API, ML service, and admin system
+frontend/                     React 18 client
 data/                         Raw MovieLens, TMDB, and IMDb files
 data_science/notebooks/       Nine analysis and modeling notebooks
 data_science/processed/       Cleaned Parquet datasets
+deploy/                       EC2 setup script
 documents/                    Concise notebook and experiment notes
 models/                       Trained model artifacts and evaluation outputs
-movie_recommendation_system/  Flask backend, React frontend, and Docker setup
+docker-compose.yml            Development environment (PostgreSQL + Flask + React)
+docker-compose.prod.yml       Production environment (gunicorn + nginx)
 requirements.txt              Shared Python dependencies
 ```
 
@@ -143,9 +147,8 @@ On Linux or macOS, activate the environment with `source .venv/bin/activate`.
 ### Backend
 
 ```powershell
-Copy-Item movie_recommendation_system\backend\.env.example `
-  movie_recommendation_system\backend\.env
-Set-Location movie_recommendation_system\backend
+Copy-Item backend\.env.example backend\.env
+Set-Location backend
 python run.py
 ```
 
@@ -156,7 +159,7 @@ The API runs at `http://localhost:5000`. Its health endpoint is `GET /health`.
 In a second terminal:
 
 ```powershell
-Set-Location movie_recommendation_system\frontend
+Set-Location frontend
 npm install
 npm start
 ```
@@ -166,7 +169,7 @@ The client runs at `http://localhost:3000`.
 ### Tests
 
 ```powershell
-Set-Location movie_recommendation_system\frontend
+Set-Location frontend
 $env:CI='true'
 npm test -- --watchAll=false
 npm run build
@@ -182,7 +185,7 @@ npm run build
 
 ## Documentation
 
-The [documentation index](documents/README.md) links each notebook to a concise account of its method, evidence, outputs, and limitations. Application-specific setup and API details are in [movie_recommendation_system/README.md](movie_recommendation_system/README.md).
+The [documentation index](documents/README.md) links each notebook to a concise account of its method, evidence, outputs, and limitations. Application-specific setup and API details are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Project history
 

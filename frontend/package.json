@@ -1,5 +1,5 @@
 {
-  "name": "movie-recommendation-frontend",
+  "name": "movie-recommendation-engine",
   "version": "1.0.0",
   "private": true,
   "dependencies": {

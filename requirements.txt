@@ -1,6 +1,6 @@
 # Install the application and data-science dependencies into the single
 # repository-local .venv environment.
--r movie_recommendation_system/backend/requirements.txt
+-r backend/requirements.txt
 
 # Notebook / analysis tooling
 ipykernel

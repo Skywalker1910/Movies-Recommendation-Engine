@@ -34,7 +34,7 @@ services:
       CORS_ORIGINS:   http://localhost:3000
     volumes:
       # Mount the entire project root so ML models and datasets are accessible
-      - ..:/workspace:ro
+      - .:/workspace:ro
       - ./backend:/app
     depends_on:
       db:

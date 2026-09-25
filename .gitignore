@@ -23,6 +23,6 @@ data_science/processed/
 models/
 
 # Frontend build artifacts
-movie_recommendation_system/frontend/build/
-movie_recommendation_system/frontend/node_modules/
+frontend/build/
+frontend/node_modules/
 
