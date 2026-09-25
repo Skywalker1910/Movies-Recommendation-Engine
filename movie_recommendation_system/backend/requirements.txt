@@ -1,0 +1,29 @@
+# Web framework
+flask>=3.0.0
+flask-cors>=4.0.0
+flask-sqlalchemy>=3.1.0
+flask-jwt-extended>=4.6.0
+flask-bcrypt>=1.0.1
+PyJWT>=2.8.0
+
+# Environment
+python-dotenv>=1.0.0
+truststore>=0.10.4  # use the operating system certificate store for HTTPS
+
+# Data / ML
+scikit-learn
+pandas
+numpy
+scipy
+joblib
+pyarrow           # parquet support for master_movies.parquet
+requests          # TMDB API requests in movie_service.py
+
+# Database drivers
+psycopg2-binary   # PostgreSQL (production); ignored gracefully on SQLite-only dev
+
+# Production server
+gunicorn>=21.2.0
+
+# Dataset download (dev only)
+kagglehub
