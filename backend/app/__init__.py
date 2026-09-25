@@ -97,12 +97,19 @@ def create_app(env: str = "development") -> Flask:
     def server_error(_e):
         return jsonify({"error": "Internal server error"}), 500
 
-    # Create DB tables on first run
+    # Create DB tables on first run (safe for concurrent gunicorn workers)
     with app.app_context():
-        db.create_all()
+        import sqlalchemy
+        try:
+            db.create_all()
+        except sqlalchemy.exc.OperationalError:
+            pass  # Another worker already created the tables
         from .admin_service import ensure_default_model_config
 
-        ensure_default_model_config()
+        try:
+            ensure_default_model_config()
+        except sqlalchemy.exc.OperationalError:
+            pass
 
     return app
 
