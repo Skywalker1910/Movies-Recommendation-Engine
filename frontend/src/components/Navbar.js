@@ -25,7 +25,7 @@ export default function Navbar() {
 
   return (
     <nav className={`nav ${solid ? 'solid' : ''}`}>
-      <Link to="/dashboard" className="nav-logo">CineMatch</Link>
+      <Link to="/dashboard" className="nav-logo">MRE</Link>
 
       <div className="nav-links">
         <NavLink to="/dashboard" className={({ isActive }) => `nav-link nav-link-main ${isActive ? 'active' : ''}`}>

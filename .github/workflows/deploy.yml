@@ -26,5 +26,16 @@ jobs:
           script: |
             cd ~/Movies-Recommendation-Engine
             git pull origin main
+
+            # Build and deploy
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
-            docker image prune -f
+
+            # Cleanup: remove old images, build cache, and stopped containers
+            docker image prune -af --filter "until=24h"
+            docker builder prune -af --filter "until=24h"
+            docker container prune -f
+
+            # Report disk usage
+            echo "=== Disk usage after cleanup ==="
+            df -h / | tail -1
+            docker system df

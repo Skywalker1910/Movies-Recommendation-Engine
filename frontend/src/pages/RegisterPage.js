@@ -117,7 +117,7 @@ export default function RegisterPage() {
   return (
     <div className="auth-bg page-enter">
       <div className="auth-card" style={{ maxWidth: step === 2 ? 480 : 420 }}>
-        <div className="auth-logo">CineMatch</div>
+        <div className="auth-logo">MRE</div>
         <StepDots step={step} />
 
         {error && <div className="auth-error" style={{ marginBottom: 16 }}>{error}</div>}
@@ -282,7 +282,7 @@ export default function RegisterPage() {
             onClick={step === TOTAL - 1 ? handleSubmit : nextStep}
             disabled={loading}
           >
-            {loading ? 'Creating account…' : step === TOTAL - 1 ? 'Launch CineMatch 🚀' : 'Continue'}
+            {loading ? 'Creating account…' : step === TOTAL - 1 ? 'Create Account' : 'Continue'}
           </button>
         </div>
 

@@ -27,7 +27,7 @@ export default function MovieCard({ movie }) {
   return (
     <div className="card" onClick={() => navigate(`/movie/${movie.id}`)}>
       <PosterImage
-        src={movie.poster_url}
+        src={movie.poster_thumb_url || movie.poster_url}
         alt={`${movie.title} poster`}
         className="card-poster"
         fallback={(

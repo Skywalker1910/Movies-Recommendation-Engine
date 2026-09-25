@@ -234,7 +234,7 @@ export default function AdminPage() {
   return (
     <div className="admin-shell page-enter">
       <nav className="admin-console-bar">
-        <div><strong>CineMatch</strong><span>Operations Console</span></div>
+        <div><strong>MRE</strong><span>Operations Console</span></div>
         <div className="admin-session">
           <span>{admin?.displayName}</span>
           <small>{admin?.email}</small>

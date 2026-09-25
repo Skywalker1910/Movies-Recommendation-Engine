@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="auth-bg page-enter">
       <div className="auth-card">
-        <div className="auth-logo">CineMatch</div>
+        <div className="auth-logo">MRE</div>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-sub">Sign in to see your personalised recommendations.</p>
 
