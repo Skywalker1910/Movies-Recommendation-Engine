@@ -37,8 +37,11 @@ logger = logging.getLogger(__name__)
 # Layout:  <workspace>/movie_recommendation_system/backend/app/ml_service.py
 #           parents[3] = <workspace root>
 _WORKSPACE = pathlib.Path(__file__).resolve().parents[3]
-MODELS_DIR    = _WORKSPACE / "models"
-PROCESSED_DIR = _WORKSPACE / "data_science" / "processed"
+
+# Allow env-var override for containerised deployments (e.g. MODELS_DIR=/workspace/models)
+import os as _os
+MODELS_DIR    = pathlib.Path(_os.environ["MODELS_DIR"]) if _os.environ.get("MODELS_DIR") else _WORKSPACE / "models"
+PROCESSED_DIR = pathlib.Path(_os.environ.get("PROCESSED_DIR", "")) if _os.environ.get("PROCESSED_DIR") else _WORKSPACE / "data_science" / "processed"
 
 # Resolve data dir: prefer local, fall back to project-level data/movielens
 _LOCAL_DATA   = pathlib.Path(__file__).resolve().parent.parent / "data" / "movies-dataset"
