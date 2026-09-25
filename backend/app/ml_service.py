@@ -9,20 +9,22 @@ This avoids a 30-60 s startup cost and allows the web server to respond to
 
 Fallback hierarchy
 ------------------
-1. Full hybrid (FunkSVD + NeuMF + TF-IDF + popularity)  ← preferred
-2. FunkSVD + TF-IDF + popularity                         ← if NeuMF unavailable
-3. TF-IDF content + popularity                           ← if no ML models at all
-4. movie_service.get_trending()                          ← last resort
+1. Full hybrid (FunkSVD + NeuMF + TF-IDF + popularity)  <- preferred
+2. FunkSVD + TF-IDF + popularity                         <- if NeuMF unavailable
+3. TF-IDF content + popularity                           <- if no ML models at all
+4. movie_service.get_trending()                          <- last resort
 
 Recommendation sections
 -----------------------
-  section="recommended"  → cold-start blend: popularity + genre boost
-  section="favorites"    → content-based seeded by favourite movies
-  section="trending"     → pure popularity sort (no ML)
+  section="recommended"  -> personalized blend: content + popularity + genre + CF
+  section="favorites"    -> content-based seeded by favourite movies
+  section="trending"     -> pure popularity sort (no ML)
 """
 import logging
+import os as _os
 import pathlib
 import pickle
+import random
 from datetime import UTC, datetime
 
 import numpy as np
@@ -39,7 +41,6 @@ logger = logging.getLogger(__name__)
 _WORKSPACE = pathlib.Path(__file__).resolve().parents[2]
 
 # Allow env-var override for containerised deployments (e.g. MODELS_DIR=/workspace/models)
-import os as _os
 MODELS_DIR    = pathlib.Path(_os.environ["MODELS_DIR"]) if _os.environ.get("MODELS_DIR") else _WORKSPACE / "models"
 PROCESSED_DIR = pathlib.Path(_os.environ.get("PROCESSED_DIR", "")) if _os.environ.get("PROCESSED_DIR") else _WORKSPACE / "data_science" / "processed"
 
@@ -114,7 +115,7 @@ def _load():
         art["tfidf"] = sp.load_npz(MODELS_DIR / "tfidf_matrix.npz")
         with open(MODELS_DIR / "title_to_idx.pkl", "rb") as f:
             art["title_to_idx"] = pickle.load(f)
-        # Build reverse mapping: tfidf-row-index → title
+        # Build reverse mapping: tfidf-row-index -> title
         art["idx_to_title"] = {
             (v.iloc[0] if hasattr(v, "iloc") else v): k
             for k, v in art["title_to_idx"].items()
@@ -136,6 +137,18 @@ def _load():
         art["master"] = master
         art["bayesian"] = master.set_index("tmdb_id")["bayesian_score"].to_dict()
 
+        # ── Pre-build genre index for diversified candidate selection ─────────
+        genre_index = {}
+        movie_service._load()
+        for _, row in movie_service.df.iterrows():
+            tmdb_id = int(row["id"])
+            mid = art["tmdb2movie"].get(tmdb_id)
+            if mid is None:
+                continue
+            for genre in (row.get("genres_list") or []):
+                genre_index.setdefault(genre, []).append(mid)
+        art["genre_index"] = genre_index
+
         # ── NeuMF (NB08) — optional ──────────────────────────────────────────
         try:
             import torch
@@ -152,7 +165,6 @@ def _load():
                 def __init__(self, n_users, n_movies, gmf_dim=32, mlp_dim=64,
                              mlp_layers=(128, 64, 32), dropout=0.2):
                     super().__init__()
-                    # Attribute names must match the keys written by notebook 08.
                     self.gmf_user_emb = nn.Embedding(n_users, gmf_dim)
                     self.gmf_item_emb = nn.Embedding(n_movies, gmf_dim)
                     self.mlp_user_emb = nn.Embedding(n_users, mlp_dim)
@@ -244,15 +256,105 @@ def _score_pop(mids, art) -> dict:
     return _minmax(scores)
 
 
-def _candidate_pool(art, seen_tmdb: set, n: int = 300) -> list:
-    """Top-N unseen MovieLens movieIds sorted by bayesian_score."""
-    cands = (
+def _score_content(fav_tmdb_ids, mids, art) -> dict:
+    """Score candidates by TF-IDF similarity to the user's favorite movies."""
+    from sklearn.metrics.pairwise import cosine_similarity as cos_sim
+
+    if not fav_tmdb_ids:
+        return {}
+
+    tfidf = art["tfidf"]
+    title_to_idx = art["title_to_idx"]
+
+    # Find TF-IDF indices for favorite movies
+    seed_indices = []
+    for tmdb_id in fav_tmdb_ids[:5]:
+        movie = movie_service.get_by_id(int(tmdb_id), enrich=False)
+        if not movie:
+            continue
+        title = movie.get("title", "")
+        if title not in title_to_idx:
+            continue
+        idx = title_to_idx[title]
+        if hasattr(idx, "iloc"):
+            idx = idx.iloc[0]
+        seed_indices.append(int(idx))
+
+    if not seed_indices:
+        return {}
+
+    # Average similarity across all seeds
+    agg_sim = None
+    for idx in seed_indices:
+        sim = cos_sim(tfidf[idx], tfidf).flatten()
+        agg_sim = sim if agg_sim is None else agg_sim + sim
+    agg_sim /= len(seed_indices)
+
+    # Map candidate movieIds to TF-IDF row indices via title lookup
+    idx_to_title = art["idx_to_title"]
+    scores = {}
+    for mid in mids:
+        tmdb = art["movie2tmdb"].get(mid)
+        if not tmdb:
+            continue
+        movie = movie_service.get_by_id(int(tmdb), enrich=False)
+        if not movie:
+            continue
+        title = movie.get("title", "")
+        if title not in title_to_idx:
+            scores[mid] = 0.0
+            continue
+        tidx = title_to_idx[title]
+        if hasattr(tidx, "iloc"):
+            tidx = tidx.iloc[0]
+        scores[mid] = float(agg_sim[int(tidx)])
+
+    return _minmax(scores)
+
+
+def _diversified_candidate_pool(art, fav_genres, fav_tmdb_ids, seen_tmdb, n=500):
+    """Build a diverse candidate pool from multiple sources instead of pure popularity."""
+    seen = set(seen_tmdb)
+    all_cands = set()
+
+    merged = (
         art["master"]
         .merge(art["links_df"][["tmdb_id", "movieId"]], on="tmdb_id", how="inner")
-        .sort_values("bayesian_score", ascending=False)
     )
-    cands = cands[~cands["tmdb_id"].isin(seen_tmdb)]
-    return cands["movieId"].head(n).tolist()
+
+    # Source 1: Top by popularity (50% of pool)
+    pop_cands = merged.sort_values("bayesian_score", ascending=False)
+    pop_cands = pop_cands[~pop_cands["tmdb_id"].isin(seen)]
+    all_cands.update(pop_cands["movieId"].head(n // 2).tolist())
+
+    # Source 2: Genre-matched candidates (30% of pool)
+    genre_index = art.get("genre_index", {})
+    if fav_genres:
+        genre_mids = set()
+        for genre in fav_genres:
+            genre_mids.update(genre_index.get(genre, []))
+        # Filter to unseen and pick from genre pool
+        genre_mids_filtered = []
+        for mid in genre_mids:
+            tmdb = art["movie2tmdb"].get(mid)
+            if tmdb and tmdb not in seen and mid not in all_cands:
+                score = art["bayesian"].get(tmdb, 0)
+                genre_mids_filtered.append((mid, score))
+        # Sort by bayesian score within genre pool
+        genre_mids_filtered.sort(key=lambda x: x[1], reverse=True)
+        all_cands.update(mid for mid, _ in genre_mids_filtered[:n * 3 // 10])
+
+    # Source 3: Random exploration from mid-tier popularity (20% of pool)
+    mid_tier = merged.sort_values("bayesian_score", ascending=False)
+    mid_tier = mid_tier[~mid_tier["tmdb_id"].isin(seen)]
+    # Pick from ranks 200-2000 (good movies that aren't always at the top)
+    exploration_pool = mid_tier.iloc[200:2000]["movieId"].tolist()
+    if exploration_pool:
+        sample_size = min(n // 5, len(exploration_pool))
+        random.seed()  # True randomness for diversity
+        all_cands.update(random.sample(exploration_pool, sample_size))
+
+    return list(all_cands)[:n]
 
 
 def _serving_config() -> dict:
@@ -410,8 +512,9 @@ def get_model_inventory(load_artifacts: bool = False) -> dict:
         "activeConfig": config,
         "models": models,
         "pipeline": [
-            "candidate_pool", "component_scoring", "score_normalization",
-            "weighted_blend", "genre_boost", "rank_and_enrich",
+            "diversified_candidate_pool", "component_scoring",
+            "score_normalization", "weighted_blend",
+            "genre_boost", "rank_and_enrich",
         ],
     }
 
@@ -516,7 +619,7 @@ def get_recommendations(
 
     if section == "favorites" and favorite_movie_tmdb_ids:
         result = _recs_by_favorites(favorite_movie_tmdb_ids, watched_tmdb_ids or [], n)
-        return result or _cold_start(
+        return result or _personalized_blend(
             favorite_movie_tmdb_ids,
             favorite_genres or [],
             watched_tmdb_ids or [],
@@ -524,7 +627,7 @@ def get_recommendations(
             movielens_user_id,
         )
 
-    return _cold_start(
+    return _personalized_blend(
         favorite_movie_tmdb_ids or [],
         favorite_genres or [],
         watched_tmdb_ids or [],
@@ -533,43 +636,87 @@ def get_recommendations(
     )
 
 
-def _cold_start(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id=None) -> list:
-    """Blend available personalized scores with popularity and genre signals."""
+def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id=None):
+    """
+    Personalized recommendations using all available signals.
+
+    For cold-start users (no MovieLens mapping): content similarity + popularity + genre boost
+    For mapped users: adds FunkSVD and NeuMF collaborative signals
+    """
     art = _load()
     if art is None:
         return movie_service.get_trending(limit=n)
 
     config = _serving_config()
-    seen   = set(watched_tmdb)
-    cands  = _candidate_pool(art, seen, n=int(config["candidatePoolSize"]))
+    seen = set(watched_tmdb)
+
+    # Diversified candidate pool instead of pure popularity
+    cands = _diversified_candidate_pool(
+        art, fav_genres, fav_tmdb, seen,
+        n=int(config["candidatePoolSize"]),
+    )
     if not cands:
         return movie_service.get_trending(limit=n)
 
-    s_pop  = _score_pop(cands, art)
+    # Score from all available signals
+    s_pop = _score_pop(cands, art)
     s_funk = _score_funk(movielens_user_id, cands, art) if movielens_user_id else {}
     s_ncf = _score_ncf(movielens_user_id, cands, art) if movielens_user_id else {}
+    s_content = _score_content(fav_tmdb, cands, art) if fav_tmdb else {}
 
-    boost = float(config["genreBoost"])
-    genre_boost = {}
+    # Adaptive weights based on available signals (NB09 switching strategy)
+    has_cf = bool(s_funk or s_ncf)
+    has_content = bool(s_content)
+
+    if has_cf:
+        # Mapped user: CF-led blend
+        w_pop = float(config["popularityWeight"]) * 0.3
+        w_funk = float(config["funkSvdWeight"])
+        w_ncf = float(config["neuMfWeight"])
+        w_content = 0.15 if has_content else 0.0
+    elif has_content:
+        # Cold-start with favorites: content-led blend
+        w_pop = float(config["popularityWeight"]) * 0.35
+        w_funk = 0.0
+        w_ncf = 0.0
+        w_content = 0.65
+    else:
+        # No signals at all: pure popularity
+        w_pop = 1.0
+        w_funk = 0.0
+        w_ncf = 0.0
+        w_content = 0.0
+
+    # Genre boost: multiplicative (1 + boost) for matching genres
+    boost_factor = 1.0 + float(config["genreBoost"])
+    genre_multiplier = {}
     if fav_genres:
+        fav_genre_set = set(fav_genres)
         for mid in cands:
             tmdb = art["movie2tmdb"].get(mid)
             if not tmdb:
                 continue
             movie = movie_service.get_by_id(int(tmdb), enrich=False)
-            if movie and any(g in fav_genres for g in movie.get("genres", [])):
-                genre_boost[mid] = boost
+            if movie:
+                movie_genres = set(movie.get("genres", []))
+                overlap = len(fav_genre_set & movie_genres)
+                if overlap:
+                    # Stronger boost for more genre overlap
+                    genre_multiplier[mid] = 1.0 + (boost_factor - 1.0) * min(overlap, 3) / 3.0
 
-    final = {
-        movie_id: (
-            float(config["popularityWeight"]) * s_pop.get(movie_id, 0)
-            + float(config["funkSvdWeight"]) * s_funk.get(movie_id, 0)
-            + float(config["neuMfWeight"]) * s_ncf.get(movie_id, 0)
-            + genre_boost.get(movie_id, 0)
+    # Compute final blended score
+    final = {}
+    for mid in cands:
+        score = (
+            w_pop * s_pop.get(mid, 0)
+            + w_funk * s_funk.get(mid, 0)
+            + w_ncf * s_ncf.get(mid, 0)
+            + w_content * s_content.get(mid, 0)
         )
-        for movie_id in cands
-    }
-    top   = sorted(final, key=final.get, reverse=True)[:n]
+        score *= genre_multiplier.get(mid, 1.0)
+        final[mid] = score
+
+    top = sorted(final, key=final.get, reverse=True)[:n]
 
     ranked_movies = []
     for mid in top:
@@ -594,16 +741,19 @@ def _cold_start(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id=None) -
             "popularity": round(float(s_pop.get(mid, 0)), 4),
             "funkSvd": round(float(s_funk.get(mid, 0)), 4) if s_funk else None,
             "neuMf": round(float(s_ncf.get(mid, 0)), 4) if s_ncf else None,
-            "genreBoost": round(float(genre_boost.get(mid, 0)), 4),
+            "content": round(float(s_content.get(mid, 0)), 4) if s_content else None,
+            "genreMultiplier": round(genre_multiplier.get(mid, 1.0), 4),
             "final": round(float(final[mid]), 4),
         }
-        movie["reason"] = (
-            "Personalized from your MovieLens profile"
-            if s_funk or s_ncf
-            else "Matches your genre preferences"
-            if mid in genre_boost
-            else "Popular and highly rated"
-        )
+        # Determine reason
+        if has_cf:
+            movie["reason"] = "Personalized from your viewing profile"
+        elif s_content.get(mid, 0) > 0.3:
+            movie["reason"] = "Similar to films you love"
+        elif mid in genre_multiplier:
+            movie["reason"] = "Matches your genre preferences"
+        else:
+            movie["reason"] = "Popular and highly rated"
         result.append(movie)
 
     return result[:n]
@@ -618,7 +768,7 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
         return []
 
     seen  = set(watched_tmdb)
-    seeds = [t for t in fav_tmdb if t not in seen][:3]
+    seeds = [t for t in fav_tmdb if t not in seen][:5]  # Use up to 5 seeds
     if not seeds:
         return []
 
@@ -646,7 +796,12 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
     if agg_sim is None:
         return []
 
-    reason = f"Because you liked {seed_titles[0]}" if seed_titles else "Based on your favourites"
+    agg_sim /= len(seed_titles)  # Average similarity across seeds
+
+    if len(seed_titles) > 1:
+        reason = f"Based on {seed_titles[0]} and {len(seed_titles) - 1} more"
+    else:
+        reason = f"Because you liked {seed_titles[0]}"
     scored = sorted(enumerate(agg_sim), key=lambda x: x[1], reverse=True)
 
     excluded = set(fav_tmdb) | seen
@@ -657,7 +812,6 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
         title = idx_to_title.get(row_idx)
         if not title:
             continue
-        # Find tmdb_id from movie_service
         matches = movie_service.df[movie_service.df["title"] == title]
         if matches.empty:
             continue
