@@ -21,5 +21,6 @@ ENV FLASK_APP=run.py
 CMD ["gunicorn", "run:application", \
      "--bind", "0.0.0.0:5000", \
      "--workers", "2", \
+     "--preload", \
      "--timeout", "120", \
      "--access-logfile", "-"]
