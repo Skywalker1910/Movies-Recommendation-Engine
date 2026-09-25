@@ -16,11 +16,11 @@ EXPOSE 5000
 
 ENV FLASK_APP=run.py
 
-# Gunicorn: 2 workers keeps memory under ~800MB on t3.micro (1GB RAM)
-# Timeout 120s allows lazy ML model loading on first request
+# Gunicorn: 1 worker for t3.micro (1GB RAM) — 2 workers OOM on CSV load
+# Timeout 300s allows lazy catalog + ML model loading on first request
 CMD ["gunicorn", "run:application", \
      "--bind", "0.0.0.0:5000", \
-     "--workers", "2", \
+     "--workers", "1", \
      "--preload", \
-     "--timeout", "120", \
+     "--timeout", "300", \
      "--access-logfile", "-"]
