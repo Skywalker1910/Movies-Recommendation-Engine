@@ -44,6 +44,40 @@ _WORKSPACE = pathlib.Path(__file__).resolve().parents[2]
 MODELS_DIR    = pathlib.Path(_os.environ["MODELS_DIR"]) if _os.environ.get("MODELS_DIR") else _WORKSPACE / "models"
 PROCESSED_DIR = pathlib.Path(_os.environ.get("PROCESSED_DIR", "")) if _os.environ.get("PROCESSED_DIR") else _WORKSPACE / "data_science" / "processed"
 
+# ── Hugging Face model download ──────────────────────────────────────────────
+HF_REPO_ID = "Skywalker1910/movie-rec-models"
+
+_REQUIRED_FILES = [
+    "funksvd_model.pkl", "user_item_matrix.npz",
+    "user_id_map.pkl", "movie_id_map.pkl",
+    "ncf_model_weights.pt", "ncf_config.pkl",
+    "ncf_user_enc.pkl", "ncf_movie_enc.pkl",
+    "tfidf_matrix.npz", "title_to_idx.pkl",
+]
+
+def _ensure_models():
+    """Download production models from Hugging Face if not present locally."""
+    missing = [f for f in _REQUIRED_FILES if not (MODELS_DIR / f).exists()]
+    if not missing:
+        return
+    try:
+        from huggingface_hub import hf_hub_download
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info("Downloading %d model files from %s", len(missing), HF_REPO_ID)
+        for fname in missing:
+            logger.info("  Fetching %s ...", fname)
+            hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename=fname,
+                local_dir=str(MODELS_DIR),
+                repo_type="model",
+            )
+        logger.info("Model download complete")
+    except ImportError:
+        logger.warning("huggingface_hub not installed; cannot auto-download models")
+    except Exception as exc:
+        logger.error("Model download failed: %s", exc)
+
 # Resolve data dir: prefer local, fall back to project-level data/movielens
 _LOCAL_DATA   = pathlib.Path(__file__).resolve().parent.parent / "data" / "movies-dataset"
 _PROJECT_DATA = _WORKSPACE / "data" / "movielens"
@@ -89,6 +123,8 @@ _cache = {"loaded": False, "art": None}
 def _load():
     if _cache["loaded"]:
         return _cache["art"]
+
+    _ensure_models()
 
     art = {}
     try:

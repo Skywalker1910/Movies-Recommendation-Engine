@@ -56,20 +56,32 @@ cd "$REPO_DIR"
 echo "=== Creating data directories ==="
 mkdir -p data/movielens models data_science/processed
 
+echo "=== Installing pip + huggingface_hub ==="
+sudo yum install -y python3-pip 2>/dev/null || sudo apt-get install -y python3-pip
+pip3 install --quiet huggingface_hub
+
+echo "=== Downloading ML models from Hugging Face Hub ==="
+python3 -c "
+from huggingface_hub import snapshot_download
+snapshot_download('Skywalker1910/movie-rec-models', local_dir='models/',
+                  allow_patterns=['*.pkl','*.npz','*.pt','*.npy','*.joblib'])
+print('Models downloaded successfully')
+"
+
 echo ""
 echo "=========================================="
 echo " Setup complete!"
 echo "=========================================="
 echo ""
 echo " Next steps:"
-echo "  1. Upload ML models:      scp -r models/ ec2-user@<IP>:~/Movies-Recommendation-Engine/"
-echo "  2. Upload processed data: scp -r data_science/processed/ ec2-user@<IP>:~/Movies-Recommendation-Engine/data_science/"
-echo "  3. Upload dataset:        scp -r data/movielens/ ec2-user@<IP>:~/Movies-Recommendation-Engine/data/"
-echo "  4. Configure secrets:     cp backend/.env.production.example backend/.env.production"
+echo "  1. Upload processed data: scp -r data_science/processed/ ec2-user@<IP>:~/Movies-Recommendation-Engine/data_science/"
+echo "  2. Upload dataset:        scp -r data/movielens/ ec2-user@<IP>:~/Movies-Recommendation-Engine/data/"
+echo "  3. Configure secrets:     cp backend/.env.production.example backend/.env.production"
 echo "                            nano backend/.env.production"
-echo "  5. Generate secrets:      python3 -c \"import secrets; print(secrets.token_urlsafe(64))\""
-echo "  6. Deploy:                docker compose -f docker-compose.prod.yml up -d --build"
-echo "  7. Create admin:          docker compose -f docker-compose.prod.yml exec backend flask create-admin"
+echo "  4. Generate secrets:      python3 -c \"import secrets; print(secrets.token_urlsafe(64))\""
+echo "  5. Deploy:                docker compose -f docker-compose.prod.yml up -d --build"
+echo "  6. Create admin:          docker compose -f docker-compose.prod.yml exec backend flask create-admin"
 echo ""
+echo " ML models are auto-downloaded from HuggingFace: Skywalker1910/movie-rec-models"
 echo " Your app will be at: http://<EC2-PUBLIC-IP>"
 echo "=========================================="

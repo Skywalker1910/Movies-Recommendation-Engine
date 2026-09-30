@@ -17,10 +17,14 @@ __pycache__/
 *.sqlite-journal
 instance/
 
-# Large data and model files — download or train locally, do not commit
+# Large data and model files — auto-downloaded from HuggingFace Hub at runtime
 data/
 data_science/processed/
 models/
+
+# DVC (removed — models now versioned on HuggingFace Hub)
+.dvc/cache/
+.dvc/tmp/
 
 # Frontend build artifacts
 frontend/build/
