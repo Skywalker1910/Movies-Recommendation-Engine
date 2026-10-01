@@ -1,5 +1,0 @@
-[cache]
-    type = hardlink
-    shared = group
-[core]
-    autostage = true

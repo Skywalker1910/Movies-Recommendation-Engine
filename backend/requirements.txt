@@ -25,5 +25,8 @@ psycopg2-binary   # PostgreSQL (production); ignored gracefully on SQLite-only d
 # Production server
 gunicorn>=21.2.0
 
+# Model registry
+huggingface_hub
+
 # Dataset download (dev only)
 kagglehub
