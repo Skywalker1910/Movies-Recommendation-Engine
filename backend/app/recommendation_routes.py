@@ -54,3 +54,27 @@ def similar_movies(tmdb_id):
         section="favorites",
     )
     return jsonify(recs)
+
+
+@rec_bp.route("/preview", methods=["POST"])
+def preview_recommendations():
+    """Public preview — returns recommendations for given genres + movies without auth."""
+    body = request.get_json(silent=True) or {}
+    genres = body.get("genres", [])
+    movie_ids = body.get("movieIds", [])
+
+    if not genres and not movie_ids:
+        return jsonify({"error": "Provide genres or movieIds"}), 400
+
+    try:
+        n = min(int(body.get("n", 12)), 30)
+    except (TypeError, ValueError):
+        n = 12
+
+    recs = get_recommendations(
+        favorite_movie_tmdb_ids=[int(m) for m in movie_ids[:5]],
+        favorite_genres=[str(g) for g in genres[:6]],
+        n=n,
+        section="recommended",
+    )
+    return jsonify(recs)

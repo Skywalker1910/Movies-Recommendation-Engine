@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 import { userAPI } from '../api/api';
@@ -110,7 +111,7 @@ export default function ProfilePage() {
             </div>
             {profileSave.err && <div className="error-banner">{profileSave.err}</div>}
             <div className="profile-action">
-              {profileSave.msg && <span className="success-msg">✓ {profileSave.msg}</span>}
+              {profileSave.msg && <span className="success-msg"><Check size={14} /> {profileSave.msg}</span>}
               <button className="btn btn-primary btn-sm" onClick={profileSave.submit} disabled={profileSave.loading}>
                 {profileSave.loading ? 'Saving…' : 'Save'}
               </button>
@@ -131,7 +132,7 @@ export default function ProfilePage() {
           </div>
           {genreSave.err && <div className="error-banner">{genreSave.err}</div>}
           <div className="profile-action">
-            {genreSave.msg && <span className="success-msg">✓ {genreSave.msg}</span>}
+            {genreSave.msg && <span className="success-msg"><Check size={14} /> {genreSave.msg}</span>}
             <button className="btn btn-primary btn-sm" onClick={genreSave.submit} disabled={genreSave.loading}>
               {genreSave.loading ? 'Saving…' : 'Save Genres'}
             </button>
@@ -161,7 +162,7 @@ export default function ProfilePage() {
             </label>
             {prefsSave.err && <div className="error-banner">{prefsSave.err}</div>}
             <div className="profile-action">
-              {prefsSave.msg && <span className="success-msg">✓ {prefsSave.msg}</span>}
+              {prefsSave.msg && <span className="success-msg"><Check size={14} /> {prefsSave.msg}</span>}
               <button className="btn btn-primary btn-sm" onClick={prefsSave.submit} disabled={prefsSave.loading}>
                 {prefsSave.loading ? 'Saving…' : 'Save Preferences'}
               </button>
@@ -195,7 +196,7 @@ export default function ProfilePage() {
             </div>
             {pwSave.err && <div className="error-banner">{pwSave.err}</div>}
             <div className="profile-action">
-              {pwSave.msg && <span className="success-msg">✓ Password updated</span>}
+              {pwSave.msg && <span className="success-msg"><Check size={14} /> Password updated</span>}
               <button className="btn btn-primary btn-sm" onClick={pwSave.submit} disabled={pwSave.loading}>
                 {pwSave.loading ? 'Updating…' : 'Update Password'}
               </button>

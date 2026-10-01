@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Star } from 'lucide-react';
 import PosterImage from './PosterImage';
 
 // Genre → hue for gradient fallback cards
@@ -42,7 +43,7 @@ export default function MovieCard({ movie }) {
               <div className="fallback-title">{movie.title}</div>
               {movie.year && <div className="fallback-year">{movie.year}</div>}
               {movie.vote_average > 0 && (
-                <div className="fallback-rating">★ {movie.vote_average.toFixed(1)}</div>
+                <div className="fallback-rating"><Star size={12} /> {movie.vote_average.toFixed(1)}</div>
               )}
             </div>
           </div>
@@ -63,7 +64,7 @@ export default function MovieCard({ movie }) {
         <div className="card-title">{movie.title}</div>
         <div className="card-meta">
           {movie.vote_average > 0 && (
-            <span className="card-rating">★ {movie.vote_average.toFixed(1)}</span>
+            <span className="card-rating"><Star size={12} /> {movie.vote_average.toFixed(1)}</span>
           )}
           {movie.year && <span>{movie.year}</span>}
         </div>

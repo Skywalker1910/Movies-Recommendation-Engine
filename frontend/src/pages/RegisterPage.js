@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { X, Star, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { moviesAPI } from '../api/api';
 import PosterImage from '../components/PosterImage';
@@ -202,7 +203,7 @@ export default function RegisterPage() {
                       onClick={() => toggleMovie(m)}
                       style={{ background: 'rgba(229,9,20,.2)', border: '1px solid var(--red)', borderRadius: 100, padding: '4px 12px', fontSize: 12, color: '#fff', cursor: 'pointer' }}
                     >
-                      {m.title} ✕
+                      {m.title} <X size={12} />
                     </button>
                   ))}
                 </div>
@@ -234,9 +235,9 @@ export default function RegisterPage() {
                     />
                     <div className="movie-search-info">
                       <div className="movie-search-title">{movie.title}</div>
-                      <div className="movie-search-year">{movie.year} {movie.vote_average > 0 && `· ★ ${movie.vote_average.toFixed(1)}`}</div>
+                      <div className="movie-search-year">{movie.year} {movie.vote_average > 0 && <><span style={{ verticalAlign: 'middle' }}><Star size={11} /></span> {movie.vote_average.toFixed(1)}</>}</div>
                     </div>
-                    {selected && <span style={{ color: 'var(--red)', fontWeight: 700 }}>✓</span>}
+                    {selected && <span style={{ color: 'var(--red)', fontWeight: 700 }}><Check size={16} /></span>}
                   </div>
                 );
               })}
