@@ -128,10 +128,12 @@ def _rebuild_title_to_idx(expected_rows: int) -> dict:
     for idx, title in enumerate(master["title"]):
         if pd.notna(title):
             mapping[str(title)] = idx
-    # Persist so future loads don't need to rebuild
-    with open(MODELS_DIR / "title_to_idx.pkl", "wb") as f:
-        pickle.dump(mapping, f, protocol=pickle.HIGHEST_PROTOCOL)
-    logger.info("Rebuilt title_to_idx.pkl: %d entries", len(mapping))
+    try:
+        with open(MODELS_DIR / "title_to_idx.pkl", "wb") as f:
+            pickle.dump(mapping, f, protocol=pickle.HIGHEST_PROTOCOL)
+        logger.info("Rebuilt title_to_idx.pkl: %d entries", len(mapping))
+    except OSError:
+        logger.info("Rebuilt title_to_idx in memory (%d entries); models dir is read-only", len(mapping))
     return mapping
 
 
