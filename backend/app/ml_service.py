@@ -268,7 +268,7 @@ def _score_content(fav_tmdb_ids, mids, art) -> dict:
 
     # Find TF-IDF indices for favorite movies
     seed_indices = []
-    for tmdb_id in fav_tmdb_ids[:5]:
+    for tmdb_id in fav_tmdb_ids:
         movie = movie_service.get_by_id(int(tmdb_id), enrich=False)
         if not movie:
             continue
@@ -312,7 +312,7 @@ def _score_content(fav_tmdb_ids, mids, art) -> dict:
     return _minmax(scores)
 
 
-def _diversified_candidate_pool(art, fav_genres, fav_tmdb_ids, seen_tmdb, n=500):
+def _diversified_candidate_pool(art, fav_genres, fav_tmdb_ids, seen_tmdb, n=500, user_id=None):
     """Build a diverse candidate pool from multiple sources instead of pure popularity."""
     seen = set(seen_tmdb)
     all_cands = set()
@@ -322,37 +322,35 @@ def _diversified_candidate_pool(art, fav_genres, fav_tmdb_ids, seen_tmdb, n=500)
         .merge(art["links_df"][["tmdb_id", "movieId"]], on="tmdb_id", how="inner")
     )
 
-    # Source 1: Top by popularity (50% of pool)
+    # Source 1: Top by popularity (35% of pool)
     pop_cands = merged.sort_values("bayesian_score", ascending=False)
     pop_cands = pop_cands[~pop_cands["tmdb_id"].isin(seen)]
-    all_cands.update(pop_cands["movieId"].head(n // 2).tolist())
+    all_cands.update(pop_cands["movieId"].head(n * 35 // 100).tolist())
 
-    # Source 2: Genre-matched candidates (30% of pool)
+    # Source 2: Genre-matched candidates (40% of pool)
     genre_index = art.get("genre_index", {})
     if fav_genres:
         genre_mids = set()
         for genre in fav_genres:
             genre_mids.update(genre_index.get(genre, []))
-        # Filter to unseen and pick from genre pool
         genre_mids_filtered = []
         for mid in genre_mids:
             tmdb = art["movie2tmdb"].get(mid)
             if tmdb and tmdb not in seen and mid not in all_cands:
                 score = art["bayesian"].get(tmdb, 0)
                 genre_mids_filtered.append((mid, score))
-        # Sort by bayesian score within genre pool
         genre_mids_filtered.sort(key=lambda x: x[1], reverse=True)
-        all_cands.update(mid for mid, _ in genre_mids_filtered[:n * 3 // 10])
+        all_cands.update(mid for mid, _ in genre_mids_filtered[:n * 40 // 100])
 
-    # Source 3: Random exploration from mid-tier popularity (20% of pool)
+    # Source 3: User-seeded exploration from mid-tier popularity (25% of pool)
     mid_tier = merged.sort_values("bayesian_score", ascending=False)
     mid_tier = mid_tier[~mid_tier["tmdb_id"].isin(seen)]
-    # Pick from ranks 200-2000 (good movies that aren't always at the top)
-    exploration_pool = mid_tier.iloc[200:2000]["movieId"].tolist()
+    exploration_pool = mid_tier.iloc[100:3000]["movieId"].tolist()
     if exploration_pool:
-        sample_size = min(n // 5, len(exploration_pool))
-        random.seed()  # True randomness for diversity
-        all_cands.update(random.sample(exploration_pool, sample_size))
+        sample_size = min(n * 25 // 100, len(exploration_pool))
+        seed = hash((user_id or 0, tuple(sorted(fav_tmdb_ids or [])))) & 0xFFFFFFFF
+        rng = random.Random(seed)
+        all_cands.update(rng.sample(exploration_pool, sample_size))
 
     return list(all_cands)[:n]
 
@@ -654,6 +652,7 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
     cands = _diversified_candidate_pool(
         art, fav_genres, fav_tmdb, seen,
         n=int(config["candidatePoolSize"]),
+        user_id=movielens_user_id or hash(tuple(sorted(fav_tmdb or []))) if fav_tmdb else None,
     )
     if not cands:
         return movie_service.get_trending(limit=n)
@@ -676,10 +675,10 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
         w_content = 0.15 if has_content else 0.0
     elif has_content:
         # Cold-start with favorites: content-led blend
-        w_pop = float(config["popularityWeight"]) * 0.35
+        w_pop = 0.15
         w_funk = 0.0
         w_ncf = 0.0
-        w_content = 0.65
+        w_content = 0.85
     else:
         # No signals at all: pure popularity
         w_pop = 1.0
@@ -713,7 +712,10 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
             + w_ncf * s_ncf.get(mid, 0)
             + w_content * s_content.get(mid, 0)
         )
-        score *= genre_multiplier.get(mid, 1.0)
+        gm = genre_multiplier.get(mid, 1.0)
+        if not has_cf and fav_genres and gm == 1.0:
+            gm = 0.6
+        score *= gm
         final[mid] = score
 
     top = sorted(final, key=final.get, reverse=True)[:n]
