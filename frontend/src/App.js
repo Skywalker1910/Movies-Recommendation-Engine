@@ -14,6 +14,7 @@ import TmdbAttribution  from './components/TmdbAttribution';
 import AdminPage        from './pages/AdminPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPasswordSetupPage from './pages/AdminPasswordSetupPage';
+import PreviewPage      from './pages/PreviewPage';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/admin/setup" element={<AdminPasswordSetupPage />} />
+          <Route path="/preview" element={<PreviewPage />} />
 
           {/* Protected */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

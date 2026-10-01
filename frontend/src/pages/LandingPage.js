@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Crosshair, Flame, BookOpen, Film } from 'lucide-react';
 
 const FEATURES = [
-  { icon: '🎯', title: 'Personalised Picks', desc: 'Hybrid AI blends collaborative filtering and content similarity for spot-on recommendations.' },
-  { icon: '🔥', title: 'Trending Now', desc: 'Bayesian popularity scoring surfaces films that are genuinely great, not just viral.' },
-  { icon: '📚', title: 'Watch History', desc: 'Track what you have seen and keep your recommendations fresh and relevant.' },
-  { icon: '🎬', title: '45 000+ Titles', desc: 'Built on the full MovieLens & TMDB dataset — from silent films to today\'s blockbusters.' },
+  { icon: <Crosshair size={28} />, title: 'Personalised Picks', desc: 'Hybrid AI blends collaborative filtering and content similarity for spot-on recommendations.' },
+  { icon: <Flame size={28} />, title: 'Trending Now', desc: 'Bayesian popularity scoring surfaces films that are genuinely great, not just viral.' },
+  { icon: <BookOpen size={28} />, title: 'Watch History', desc: 'Track what you have seen and keep your recommendations fresh and relevant.' },
+  { icon: <Film size={28} />, title: '45 000+ Titles', desc: 'Built on the full MovieLens & TMDB dataset — from silent films to today\'s blockbusters.' },
 ];
 
 export default function LandingPage() {
@@ -30,7 +31,7 @@ export default function LandingPage() {
         </p>
         <div className="landing-cta">
           <Link to="/register" className="btn btn-primary btn-lg">Get Started — it's free</Link>
-          <Link to="/login" className="btn btn-secondary btn-lg">Sign In</Link>
+          <Link to="/preview" className="btn btn-secondary btn-lg">Try it first</Link>
         </div>
       </section>
 

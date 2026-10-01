@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles, Play, Star } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MovieCard from '../components/MovieCard';
 import { SkeletonRow } from '../components/SkeletonCard';
@@ -30,7 +31,7 @@ function RecSection({ section, title, accent }) {
     <div className="section">
       <div className="section-hdr">
         <h2 className="section-title">
-          {accent ? <><span>✦</span> {title}</> : title}
+          {accent ? <><Sparkles size={16} style={{ verticalAlign: 'text-bottom' }} /> {title}</> : title}
         </h2>
       </div>
       {loading
@@ -72,14 +73,14 @@ export default function DashboardPage() {
           <h1 className="hero-title">{hero?.title ?? 'Your personalised cinema'}</h1>
           <div className="hero-meta">
             {hero?.year   && <span>{hero.year}</span>}
-            {hero?.vote_average > 0 && <span>★ {hero.vote_average.toFixed(1)}</span>}
+            {hero?.vote_average > 0 && <span><Star size={14} /> {hero.vote_average.toFixed(1)}</span>}
             {hero?.genres?.[0] && <span>{hero.genres[0]}</span>}
           </div>
           {hero?.overview && <p className="hero-overview">{hero.overview}</p>}
           <div className="hero-actions">
             {hero && (
               <button className="btn btn-primary" onClick={() => navigate(`/movie/${hero.id}`)}>
-                ▶ More Info
+                <Play size={14} /> More Info
               </button>
             )}
             <button className="btn btn-secondary" onClick={() => navigate('/profile')}>
@@ -93,7 +94,7 @@ export default function DashboardPage() {
       <div className="dash-content">
         {user?.firstName && (
           <h2 style={{ fontSize: 15, color: 'var(--text-2)', marginBottom: 32 }}>
-            Good to see you back, <strong style={{ color: 'var(--text)' }}>{user.firstName}</strong> 👋
+            Welcome back, <strong style={{ color: 'var(--text)' }}>{user.firstName}</strong>
           </h2>
         )}
         {SECTIONS.map(s => (

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Star, Check, Film } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MovieCard from '../components/MovieCard';
 import PosterImage from '../components/PosterImage';
@@ -47,7 +48,7 @@ export default function MovieDetailsPage() {
         setWatchMsg('Removed from watched');
       } else {
         await userAPI.markWatched(Number(id));
-        setWatchMsg('Marked as watched ✓');
+        setWatchMsg('Marked as watched');
       }
       await refreshUser();
     } catch (_) {
@@ -69,7 +70,7 @@ export default function MovieDetailsPage() {
     <div style={{ paddingTop: 80, textAlign: 'center' }}>
       <Navbar />
       <div className="empty-state">
-        <div className="empty-state-icon">🎬</div>
+        <div className="empty-state-icon"><Film size={48} /></div>
         <div className="empty-state-title">Movie not found</div>
         <button className="btn btn-outline" style={{ marginTop: 16 }} onClick={() => navigate(-1)}>Go back</button>
       </div>
@@ -120,7 +121,7 @@ export default function MovieDetailsPage() {
         {/* Info */}
         <div>
           <div className="details-meta-row">
-            {movie.vote_average > 0 && <span className="details-rating">★ {movie.vote_average.toFixed(1)}</span>}
+            {movie.vote_average > 0 && <span className="details-rating"><Star size={14} /> {movie.vote_average.toFixed(1)}</span>}
             {movie.year        && <span>{movie.year}</span>}
             {movie.runtime     && <span>{movie.runtime} min</span>}
             {movie.vote_count  > 0 && <span>{movie.vote_count.toLocaleString()} ratings</span>}
@@ -145,7 +146,7 @@ export default function MovieDetailsPage() {
               onClick={handleWatch}
               disabled={watchLoading}
             >
-              {watchLoading ? '…' : isWatched ? '✓ Watched — Remove' : 'Mark as Watched'}
+              {watchLoading ? '...' : isWatched ? <><Check size={14} /> Watched — Remove</> : 'Mark as Watched'}
             </button>
             {watchMsg && <span className="watched-badge">{watchMsg}</span>}
           </div>
