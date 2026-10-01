@@ -3,14 +3,30 @@ Diagnostic test: verify that different user preferences produce different recomm
 
 Reproduces the bug where two very different user profiles get identical recommendations
 via the /movies/preview endpoint.
+
+These tests require the full movie dataset and ML model artifacts, so they are skipped
+in CI where only lightweight unit tests run.
 """
-import json
 import sys
 import os
+import pathlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
+
+_WORKSPACE = pathlib.Path(__file__).resolve().parents[2]
+_MODELS_DIR = _WORKSPACE / "models"
+_DATA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "movies-dataset"
+
+_HAS_DATA = (_DATA_DIR / "movies_metadata.csv").exists() or (_WORKSPACE / "data" / "movielens").exists()
+_HAS_MODELS = (_MODELS_DIR / "tfidf_matrix.npz").exists()
+
+pytestmark = pytest.mark.skipif(
+    not (_HAS_DATA and _HAS_MODELS),
+    reason="Requires movie dataset and ML model artifacts (not available in CI)",
+)
+
 from app import create_app
 
 
@@ -139,7 +155,6 @@ def test_content_scoring_seeds_resolve(client):
         print(f"  '{title}' -> TMDB {tmdb_id} -> catalog_title='{catalog_title}' "
               f"-> in_tfidf={in_tfidf} in_ml_mapping={in_ml} movieId={mid}")
 
-    # Check how many titles from the catalog exist in TF-IDF index
     sample_tmdb_ids = list(art["tmdb2movie"].keys())[:20]
     resolved = 0
     for tmdb_id in sample_tmdb_ids:
