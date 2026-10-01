@@ -115,6 +115,26 @@ _sys.modules.setdefault("__main__", _mod)
 _sys.modules["__main__"].FunkSVD = _FunkSVD
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _rebuild_title_to_idx(expected_rows: int) -> dict:
+    """Rebuild title->row-index mapping from master_movies.parquet."""
+    master = pd.read_parquet(
+        PROCESSED_DIR / "master_movies.parquet", columns=["title"]
+    )
+    if len(master) != expected_rows:
+        logger.error("master_movies rows (%d) != tfidf rows (%d)", len(master), expected_rows)
+    mapping = {}
+    for idx, title in enumerate(master["title"]):
+        if pd.notna(title):
+            mapping[str(title)] = idx
+    # Persist so future loads don't need to rebuild
+    with open(MODELS_DIR / "title_to_idx.pkl", "wb") as f:
+        pickle.dump(mapping, f, protocol=pickle.HIGHEST_PROTOCOL)
+    logger.info("Rebuilt title_to_idx.pkl: %d entries", len(mapping))
+    return mapping
+
+
 # ── Lazy state ────────────────────────────────────────────────────────────────
 
 _cache = {"loaded": False, "art": None}
@@ -149,13 +169,13 @@ def _load():
 
         # ── TF-IDF (NB05) ────────────────────────────────────────────────────
         art["tfidf"] = sp.load_npz(MODELS_DIR / "tfidf_matrix.npz")
-        with open(MODELS_DIR / "title_to_idx.pkl", "rb") as f:
-            art["title_to_idx"] = pickle.load(f)
-        # Build reverse mapping: tfidf-row-index -> title
-        art["idx_to_title"] = {
-            (v.iloc[0] if hasattr(v, "iloc") else v): k
-            for k, v in art["title_to_idx"].items()
-        }
+        try:
+            with open(MODELS_DIR / "title_to_idx.pkl", "rb") as f:
+                art["title_to_idx"] = pickle.load(f)
+        except Exception:
+            logger.warning("title_to_idx.pkl incompatible; rebuilding from master_movies")
+            art["title_to_idx"] = _rebuild_title_to_idx(art["tfidf"].shape[0])
+        art["idx_to_title"] = {v: k for k, v in art["title_to_idx"].items()}
 
         # ── MovieLens links + master popularity table ─────────────────────────
         links = pd.read_csv(DATA_DIR / "links.csv", usecols=["movieId", "tmdbId"])
@@ -311,10 +331,7 @@ def _score_content(fav_tmdb_ids, mids, art) -> dict:
         title = movie.get("title", "")
         if title not in title_to_idx:
             continue
-        idx = title_to_idx[title]
-        if hasattr(idx, "iloc"):
-            idx = idx.iloc[0]
-        seed_indices.append(int(idx))
+        seed_indices.append(int(title_to_idx[title]))
 
     if not seed_indices:
         return {}
@@ -340,10 +357,7 @@ def _score_content(fav_tmdb_ids, mids, art) -> dict:
         if title not in title_to_idx:
             scores[mid] = 0.0
             continue
-        tidx = title_to_idx[title]
-        if hasattr(tidx, "iloc"):
-            tidx = tidx.iloc[0]
-        scores[mid] = float(agg_sim[int(tidx)])
+        scores[mid] = float(agg_sim[int(title_to_idx[title])])
 
     return _minmax(scores)
 
@@ -824,9 +838,7 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
         title = movie.get("title", "")
         if title not in title_to_idx:
             continue
-        idx = title_to_idx[title]
-        if hasattr(idx, "iloc"):
-            idx = idx.iloc[0]
+        idx = int(title_to_idx[title])
         sim = cos_sim(tfidf[int(idx)], tfidf).flatten()
         agg_sim = sim if agg_sim is None else agg_sim + sim
         seed_titles.append(title)
