@@ -39,6 +39,8 @@ def update_profile():
         user.favorite_genres = data["favoriteGenres"]
     if "favoriteMovies" in data:
         user.favorite_movies = data["favoriteMovies"]
+    if "preferredLanguages" in data:
+        user.preferred_languages = data["preferredLanguages"]
     if "preferences" in data:
         prefs = data["preferences"]
         if "includeWatched" in prefs:
