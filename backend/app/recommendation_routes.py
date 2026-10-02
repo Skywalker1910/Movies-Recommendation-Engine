@@ -35,6 +35,7 @@ def recommendations():
         favorite_genres=user.favorite_genres,
         watched_tmdb_ids=exclude,
         movielens_user_id=user.movielens_user_id,
+        preferred_languages=user.preferred_languages,
         n=n,
         section=section,
     )

@@ -1,13 +1,36 @@
-import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Check, X, Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
-import { userAPI } from '../api/api';
+import { userAPI, moviesAPI } from '../api/api';
 
 const GENRES = [
   'Action', 'Adventure', 'Animation', 'Comedy', 'Crime', 'Documentary',
   'Drama', 'Family', 'Fantasy', 'History', 'Horror', 'Music', 'Mystery',
   'Romance', 'Science Fiction', 'Thriller', 'War', 'Western',
+];
+
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'ko', label: 'Korean' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'mr', label: 'Marathi' },
+  { code: 'ta', label: 'Tamil' },
+  { code: 'te', label: 'Telugu' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'th', label: 'Thai' },
+  { code: 'tr', label: 'Turkish' },
+  { code: 'sv', label: 'Swedish' },
+  { code: 'da', label: 'Danish' },
+  { code: 'nl', label: 'Dutch' },
 ];
 
 const FREQ_LABELS = { daily: 'Every day', weekly: 'A few times a week', monthly: 'A few times a month' };
@@ -19,10 +42,89 @@ function useSubmit(fn) {
   const submit = async (...args) => {
     setLoading(true); setMsg(''); setErr('');
     try { await fn(...args); setMsg('Saved!'); setTimeout(() => setMsg(''), 3000); }
-    catch (e) { setErr(e.response?.data?.error || 'Error saving. Try again.'); }
+    catch (e) { setErr(e.response?.data?.error || e.message || 'Error saving. Try again.'); }
     finally { setLoading(false); }
   };
   return { loading, msg, err, submit };
+}
+
+function MovieListEditor({ movieIds, onRemove, emptyText }) {
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!movieIds?.length) { setLoading(false); return; }
+    moviesAPI.getBatch(movieIds)
+      .then(r => setMovies(r.data))
+      .catch(() => setMovies([]))
+      .finally(() => setLoading(false));
+  }, [movieIds]);
+
+  if (loading) return <div style={{ color: 'var(--text-2)', fontSize: 13, padding: 12 }}>Loading...</div>;
+  if (!movies.length) return <div style={{ color: 'var(--text-2)', fontSize: 13, padding: 12 }}>{emptyText}</div>;
+
+  return (
+    <div className="movie-list-editor">
+      {movies.map(m => (
+        <div key={m.id} className="movie-list-item">
+          {m.poster_url
+            ? <img src={m.poster_url} alt="" className="movie-list-poster" />
+            : <div className="movie-list-poster placeholder" />
+          }
+          <div className="movie-list-info">
+            <div className="movie-list-title">{m.title}</div>
+            <div className="movie-list-meta">{m.year}{m.vote_average > 0 && ` • ${m.vote_average.toFixed(1)}`}</div>
+          </div>
+          <button className="btn-icon btn-remove" onClick={() => onRemove(m.id)} title="Remove">
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MovieSearch({ onAdd, excludeIds }) {
+  const [query, setQuery]     = useState('');
+  const [results, setResults] = useState([]);
+  const [open, setOpen]       = useState(false);
+
+  const search = useCallback(async (q) => {
+    if (q.length < 2) { setResults([]); return; }
+    try {
+      const r = await moviesAPI.search(q, 8);
+      setResults(r.data.filter(m => !excludeIds.includes(m.id)));
+    } catch { setResults([]); }
+  }, [excludeIds]);
+
+  useEffect(() => {
+    const t = setTimeout(() => search(query), 300);
+    return () => clearTimeout(t);
+  }, [query, search]);
+
+  return (
+    <div className="movie-search-wrap">
+      <div className="movie-search-input">
+        <Search size={14} />
+        <input className="input" placeholder="Search to add a movie..."
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+      </div>
+      {open && results.length > 0 && (
+        <div className="movie-search-dropdown">
+          {results.map(m => (
+            <button key={m.id} className="movie-search-result"
+              onClick={() => { onAdd(m.id); setQuery(''); setResults([]); setOpen(false); }}>
+              <span className="movie-search-result-title">{m.title}</span>
+              <span className="movie-search-result-year">{m.year}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ProfilePage() {
@@ -43,6 +145,28 @@ export default function ProfilePage() {
     await userAPI.updateProfile({ favoriteGenres: genres });
     await refreshUser();
   });
+
+  const [langs, setLangs] = useState(user?.preferredLanguages ?? ['en']);
+  const toggleLang = code => setLangs(prev => prev.includes(code) ? prev.filter(x => x !== code) : [...prev, code]);
+  const langSave = useSubmit(async () => {
+    await userAPI.updateProfile({ preferredLanguages: langs });
+    await refreshUser();
+  });
+
+  const [favIds, setFavIds] = useState(user?.favoriteMovies ?? []);
+  const favSave = useSubmit(async () => {
+    await userAPI.updateProfile({ favoriteMovies: favIds });
+    await refreshUser();
+  });
+  const removeFav = id => setFavIds(prev => prev.filter(x => x !== id));
+  const addFav = id => setFavIds(prev => prev.includes(id) ? prev : [...prev, id]);
+
+  const [watchIds, setWatchIds] = useState(user?.watchedMovies ?? []);
+  const removeWatch = async (id) => {
+    await userAPI.removeWatched(id);
+    setWatchIds(prev => prev.filter(x => x !== id));
+    await refreshUser();
+  };
 
   const [prefs, setPrefs] = useState({
     includeWatched:    user?.preferences?.includeWatched    ?? false,
@@ -75,15 +199,15 @@ export default function ProfilePage() {
           <div className="profile-email">{user?.email}</div>
           <div className="profile-stats">
             <div className="stat-card">
-              <div className="stat-value">{user?.watchedMovies?.length ?? 0}</div>
+              <div className="stat-value">{watchIds.length}</div>
               <div className="stat-label">Watched</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{user?.favoriteMovies?.length ?? 0}</div>
+              <div className="stat-value">{favIds.length}</div>
               <div className="stat-label">Favourites</div>
             </div>
             <div className="stat-card">
-              <div className="stat-value">{user?.favoriteGenres?.length ?? 0}</div>
+              <div className="stat-value">{genres.length}</div>
               <div className="stat-label">Genres</div>
             </div>
             <div className="stat-card">
@@ -137,6 +261,50 @@ export default function ProfilePage() {
               {genreSave.loading ? 'Saving…' : 'Save Genres'}
             </button>
           </div>
+        </div>
+
+        {/* Language Preferences */}
+        <div className="profile-section">
+          <div className="profile-section-title">Language Preferences</div>
+          <p style={{ color: 'var(--text-2)', fontSize: 13, marginBottom: 12 }}>
+            Select your preferred movie languages. Recommendations will prioritise films in these languages.
+          </p>
+          <div className="genre-grid" style={{ marginBottom: 16 }}>
+            {LANGUAGES.map(l => (
+              <button key={l.code} type="button"
+                className={`genre-chip ${langs.includes(l.code) ? 'selected' : ''}`}
+                onClick={() => toggleLang(l.code)}
+              >{l.label}</button>
+            ))}
+          </div>
+          {langSave.err && <div className="error-banner">{langSave.err}</div>}
+          <div className="profile-action">
+            {langSave.msg && <span className="success-msg"><Check size={14} /> {langSave.msg}</span>}
+            <button className="btn btn-primary btn-sm" onClick={langSave.submit} disabled={langSave.loading}>
+              {langSave.loading ? 'Saving…' : 'Save Languages'}
+            </button>
+          </div>
+        </div>
+
+        {/* Favourite Movies */}
+        <div className="profile-section">
+          <div className="profile-section-title">Favourite Movies</div>
+          <MovieSearch onAdd={addFav} excludeIds={favIds} />
+          <MovieListEditor movieIds={favIds} onRemove={removeFav} emptyText="No favourite movies yet. Search above to add some!" />
+          {favSave.err && <div className="error-banner">{favSave.err}</div>}
+          <div className="profile-action">
+            {favSave.msg && <span className="success-msg"><Check size={14} /> {favSave.msg}</span>}
+            <button className="btn btn-primary btn-sm" onClick={favSave.submit} disabled={favSave.loading}>
+              {favSave.loading ? 'Saving…' : 'Save Favourites'}
+            </button>
+          </div>
+        </div>
+
+        {/* Watched Movies */}
+        <div className="profile-section">
+          <div className="profile-section-title">Watched Movies</div>
+          <MovieListEditor movieIds={watchIds} onRemove={removeWatch}
+            emptyText="No watched movies yet. Mark movies as watched from their detail page." />
         </div>
 
         {/* Preferences */}

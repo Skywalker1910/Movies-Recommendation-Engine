@@ -32,10 +32,11 @@ def register():
     last_name          = (data.get("lastName") or "").strip()
     email              = (data.get("email") or "").strip().lower()
     password           = data.get("password", "")
-    favorite_genres    = data.get("favoriteGenres", [])
-    favorite_movies    = data.get("favoriteMovies", [])   # list of TMDB ids
-    include_watched    = bool(data.get("includeWatched", False))
-    watching_frequency = data.get("watchingFrequency", "weekly")
+    favorite_genres      = data.get("favoriteGenres", [])
+    favorite_movies      = data.get("favoriteMovies", [])   # list of TMDB ids
+    preferred_languages  = data.get("preferredLanguages", ["en"])
+    include_watched      = bool(data.get("includeWatched", False))
+    watching_frequency   = data.get("watchingFrequency", "weekly")
 
     # ── Validation ─────────────────────────────────────────────────────────
     if not all([first_name, last_name, email, password]):
@@ -56,6 +57,7 @@ def register():
     )
     user.favorite_genres = favorite_genres
     user.favorite_movies = favorite_movies
+    user.preferred_languages = preferred_languages
 
     db.session.add(user)
     db.session.commit()

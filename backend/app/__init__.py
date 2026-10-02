@@ -104,6 +104,19 @@ def create_app(env: str = "development") -> Flask:
             db.create_all()
         except sqlalchemy.exc.OperationalError:
             pass  # Another worker already created the tables
+
+        # Migrate: add new columns to existing tables
+        _migrate_columns = [
+            ("users", "preferred_languages", "TEXT DEFAULT '[]'"),
+        ]
+        for table, column, col_type in _migrate_columns:
+            try:
+                db.session.execute(sqlalchemy.text(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"
+                ))
+                db.session.commit()
+            except sqlalchemy.exc.OperationalError:
+                db.session.rollback()
         from .admin_service import ensure_default_model_config
 
         try:

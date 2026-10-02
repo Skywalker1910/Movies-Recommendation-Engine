@@ -315,6 +315,26 @@ img  { display: block; max-width: 100%; }
 .profile-action   { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 8px; }
 .success-msg      { font-size: 13px; color: var(--green); }
 
+/* ── Movie List Editor (profile) ─────────────────────────────────────── */
+.movie-list-editor { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; max-height: 320px; overflow-y: auto; }
+.movie-list-item   { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--bg-3); border-radius: var(--r); }
+.movie-list-poster { width: 32px; height: 48px; object-fit: cover; border-radius: 4px; background: var(--bg); flex-shrink: 0; }
+.movie-list-poster.placeholder { background: linear-gradient(135deg, var(--bg), var(--bg-3)); }
+.movie-list-info   { flex: 1; min-width: 0; }
+.movie-list-title  { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.movie-list-meta   { font-size: 11px; color: var(--text-2); }
+.btn-icon          { background: none; border: none; color: var(--text-2); cursor: pointer; padding: 4px; border-radius: 4px; transition: all var(--t); display: flex; align-items: center; }
+.btn-remove:hover  { color: var(--red); background: rgba(229,9,20,.1); }
+
+.movie-search-wrap     { position: relative; margin-bottom: 8px; }
+.movie-search-input    { display: flex; align-items: center; gap: 8px; background: var(--bg-3); border: 1.5px solid var(--border); border-radius: var(--r); padding: 0 12px; }
+.movie-search-input .input { border: none; background: transparent; padding: 10px 0; }
+.movie-search-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r); margin-top: 4px; max-height: 240px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.movie-search-result   { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: none; color: var(--text); padding: 10px 14px; cursor: pointer; font-size: 13px; text-align: left; transition: background var(--t); }
+.movie-search-result:hover { background: var(--bg-3); }
+.movie-search-result-title { font-weight: 600; }
+.movie-search-result-year  { font-size: 11px; color: var(--text-2); flex-shrink: 0; }
+
 /* ── Misc ────────────────────────────────────────────────────────────────── */
 .empty-state       { text-align: center; padding: 60px 24px; color: var(--text-2); }
 .empty-state-icon  { font-size: 48px; margin-bottom: 12px; }

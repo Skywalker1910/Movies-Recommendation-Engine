@@ -329,6 +329,50 @@ def _score_pop(mids, art) -> dict:
     return _minmax(scores)
 
 
+def _score_genre(fav_genres, mids, art) -> dict:
+    """Score candidates by genre overlap with user's preferred genres."""
+    if not fav_genres:
+        return {}
+    fav_set = set(fav_genres)
+    scores = {}
+    for mid in mids:
+        tmdb = art["movie2tmdb"].get(mid)
+        if not tmdb:
+            scores[mid] = 0.0
+            continue
+        movie = movie_service.get_by_id(int(tmdb), enrich=False)
+        if not movie:
+            scores[mid] = 0.0
+            continue
+        movie_genres = set(movie.get("genres", []))
+        if not movie_genres:
+            scores[mid] = 0.0
+            continue
+        overlap = len(fav_set & movie_genres)
+        union = len(fav_set | movie_genres)
+        scores[mid] = overlap / union if union else 0.0
+    return _minmax(scores)
+
+
+def _filter_by_language(mids, preferred_languages, art) -> list:
+    """Filter candidate movie IDs to those matching preferred languages."""
+    if not preferred_languages:
+        return mids
+    lang_set = set(preferred_languages)
+    filtered = []
+    for mid in mids:
+        tmdb = art["movie2tmdb"].get(mid)
+        if not tmdb:
+            continue
+        movie = movie_service.get_by_id(int(tmdb), enrich=False)
+        if not movie:
+            continue
+        lang = movie.get("original_language", "en")
+        if lang in lang_set:
+            filtered.append(mid)
+    return filtered if filtered else mids
+
+
 def _score_content(fav_tmdb_ids, mids, art) -> dict:
     """Score candidates by TF-IDF similarity to the user's favorite movies."""
     from sklearn.metrics.pairwise import cosine_similarity as cos_sim
@@ -665,6 +709,7 @@ def get_recommendations(
     favorite_genres: list = None,
     watched_tmdb_ids: list = None,
     movielens_user_id: int | None = None,
+    preferred_languages: list = None,
     n: int = 20,
     section: str = "recommended",
 ) -> list:
@@ -676,20 +721,27 @@ def get_recommendations(
     favorite_movie_tmdb_ids : user's saved TMDB movie IDs
     favorite_genres         : user's genre preferences
     watched_tmdb_ids        : TMDB IDs to exclude (already watched)
+    preferred_languages     : ISO 639-1 language codes (e.g. ["en", "hi"])
     n                       : number of results
     section                 : "recommended" | "favorites" | "trending"
     """
     if section == "trending":
         return movie_service.get_trending(limit=n)
 
-    if section == "favorites" and favorite_movie_tmdb_ids:
-        result = _recs_by_favorites(favorite_movie_tmdb_ids, watched_tmdb_ids or [], n)
-        return result or _personalized_blend(
-            favorite_movie_tmdb_ids,
+    if section == "favorites":
+        if favorite_movie_tmdb_ids:
+            result = _recs_by_favorites(
+                favorite_movie_tmdb_ids, watched_tmdb_ids or [], n,
+                preferred_languages=preferred_languages,
+            )
+            if result:
+                return result
+        return _genre_discovery(
             favorite_genres or [],
             watched_tmdb_ids or [],
-            n,
-            movielens_user_id,
+            favorite_movie_tmdb_ids or [],
+            preferred_languages=preferred_languages,
+            n=n,
         )
 
     return _personalized_blend(
@@ -698,14 +750,16 @@ def get_recommendations(
         watched_tmdb_ids or [],
         n,
         movielens_user_id,
+        preferred_languages=preferred_languages,
     )
 
 
-def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id=None):
+def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id=None,
+                        preferred_languages=None):
     """
     Personalized recommendations using all available signals.
 
-    For cold-start users (no MovieLens mapping): content similarity + popularity + genre boost
+    For cold-start users (no MovieLens mapping): content similarity + genre + popularity
     For mapped users: adds FunkSVD and NeuMF collaborative signals
     """
     art = _load()
@@ -724,51 +778,51 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
     if not cands:
         return movie_service.get_trending(limit=n)
 
+    if preferred_languages:
+        cands = _filter_by_language(cands, preferred_languages, art)
+
     # Score from all available signals
     s_pop = _score_pop(cands, art)
     s_funk = _score_funk(movielens_user_id, cands, art) if movielens_user_id else {}
     s_ncf = _score_ncf(movielens_user_id, cands, art) if movielens_user_id else {}
     s_content = _score_content(fav_tmdb, cands, art) if fav_tmdb else {}
+    s_genre = _score_genre(fav_genres, cands, art) if fav_genres else {}
 
     # Adaptive weights based on available signals (NB09 switching strategy)
     has_cf = bool(s_funk or s_ncf)
     has_content = bool(s_content)
+    has_genre = bool(s_genre)
 
     if has_cf:
-        # Mapped user: CF-led blend
         w_pop = float(config["popularityWeight"]) * 0.3
         w_funk = float(config["funkSvdWeight"])
         w_ncf = float(config["neuMfWeight"])
         w_content = 0.15 if has_content else 0.0
+        w_genre = 0.10 if has_genre else 0.0
+    elif has_content and has_genre:
+        w_pop = 0.10
+        w_funk = 0.0
+        w_ncf = 0.0
+        w_content = 0.55
+        w_genre = 0.35
     elif has_content:
-        # Cold-start with favorites: content-led blend
         w_pop = 0.15
         w_funk = 0.0
         w_ncf = 0.0
         w_content = 0.85
+        w_genre = 0.0
+    elif has_genre:
+        w_pop = 0.30
+        w_funk = 0.0
+        w_ncf = 0.0
+        w_content = 0.0
+        w_genre = 0.70
     else:
-        # No signals at all: pure popularity
         w_pop = 1.0
         w_funk = 0.0
         w_ncf = 0.0
         w_content = 0.0
-
-    # Genre boost: multiplicative (1 + boost) for matching genres
-    boost_factor = 1.0 + float(config["genreBoost"])
-    genre_multiplier = {}
-    if fav_genres:
-        fav_genre_set = set(fav_genres)
-        for mid in cands:
-            tmdb = art["movie2tmdb"].get(mid)
-            if not tmdb:
-                continue
-            movie = movie_service.get_by_id(int(tmdb), enrich=False)
-            if movie:
-                movie_genres = set(movie.get("genres", []))
-                overlap = len(fav_genre_set & movie_genres)
-                if overlap:
-                    # Stronger boost for more genre overlap
-                    genre_multiplier[mid] = 1.0 + (boost_factor - 1.0) * min(overlap, 3) / 3.0
+        w_genre = 0.0
 
     # Compute final blended score
     final = {}
@@ -778,11 +832,8 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
             + w_funk * s_funk.get(mid, 0)
             + w_ncf * s_ncf.get(mid, 0)
             + w_content * s_content.get(mid, 0)
+            + w_genre * s_genre.get(mid, 0)
         )
-        gm = genre_multiplier.get(mid, 1.0)
-        if not has_cf and fav_genres and gm == 1.0:
-            gm = 0.6
-        score *= gm
         final[mid] = score
 
     top = sorted(final, key=final.get, reverse=True)[:n]
@@ -811,15 +862,14 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
             "funkSvd": round(float(s_funk.get(mid, 0)), 4) if s_funk else None,
             "neuMf": round(float(s_ncf.get(mid, 0)), 4) if s_ncf else None,
             "content": round(float(s_content.get(mid, 0)), 4) if s_content else None,
-            "genreMultiplier": round(genre_multiplier.get(mid, 1.0), 4),
+            "genre": round(float(s_genre.get(mid, 0)), 4) if s_genre else None,
             "final": round(float(final[mid]), 4),
         }
-        # Determine reason
         if has_cf:
             movie["reason"] = "Personalized from your viewing profile"
         elif s_content.get(mid, 0) > 0.3:
             movie["reason"] = "Similar to films you love"
-        elif mid in genre_multiplier:
+        elif s_genre.get(mid, 0) > 0.5:
             movie["reason"] = "Matches your genre preferences"
         else:
             movie["reason"] = "Popular and highly rated"
@@ -828,7 +878,7 @@ def _personalized_blend(fav_tmdb, fav_genres, watched_tmdb, n, movielens_user_id
     return result[:n]
 
 
-def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
+def _recs_by_favorites(fav_tmdb, watched_tmdb, n, preferred_languages=None) -> list:
     """Content-based recommendations seeded by the user's favourite movies."""
     from sklearn.metrics.pairwise import cosine_similarity as cos_sim
 
@@ -836,8 +886,9 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
     if art is None:
         return []
 
+    lang_set = set(preferred_languages) if preferred_languages else None
     seen  = set(watched_tmdb)
-    seeds = [t for t in fav_tmdb if t not in seen][:5]  # Use up to 5 seeds
+    seeds = [t for t in fav_tmdb if t not in seen][:5]
     if not seeds:
         return []
 
@@ -885,6 +936,10 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
         tmdb_id = int(matches.iloc[0]["id"])
         if tmdb_id in excluded:
             continue
+        if lang_set:
+            movie_obj = movie_service.get_by_id(tmdb_id, enrich=False)
+            if movie_obj and movie_obj.get("original_language", "en") not in lang_set:
+                continue
         ranked_movies.append((tmdb_id, score))
 
     movies_by_id = {
@@ -907,3 +962,66 @@ def _recs_by_favorites(fav_tmdb, watched_tmdb, n) -> list:
         result.append(movie)
 
     return result
+
+
+def _genre_discovery(fav_genres, watched_tmdb, fav_tmdb, preferred_languages=None, n=20):
+    """
+    Genre-based discovery for the "favorites" section when the user has no
+    favorite movies saved (or they didn't resolve in TF-IDF).
+    Picks highly-rated movies from the user's preferred genres, different
+    from what _personalized_blend returns by using a different selection
+    strategy (genre-purity over blended scoring).
+    """
+    art = _load()
+    if art is None:
+        return movie_service.get_trending(limit=n)
+
+    if not fav_genres:
+        return movie_service.get_trending(limit=n)
+
+    genre_index = art.get("genre_index", {})
+    seen = set(watched_tmdb) | set(fav_tmdb)
+    lang_set = set(preferred_languages) if preferred_languages else None
+
+    genre_mids = set()
+    for genre in fav_genres:
+        genre_mids.update(genre_index.get(genre, []))
+
+    scored = []
+    for mid in genre_mids:
+        tmdb = art["movie2tmdb"].get(mid)
+        if not tmdb or tmdb in seen:
+            continue
+        movie = movie_service.get_by_id(int(tmdb), enrich=False)
+        if not movie:
+            continue
+        if lang_set and movie.get("original_language", "en") not in lang_set:
+            continue
+        movie_genres = set(movie.get("genres", []))
+        fav_set = set(fav_genres)
+        overlap = len(fav_set & movie_genres)
+        pop = art["bayesian"].get(tmdb, 0)
+        scored.append((mid, tmdb, overlap, pop))
+
+    scored.sort(key=lambda x: (x[2], x[3]), reverse=True)
+
+    ranked = scored[:n]
+    movies_by_id = {
+        m["id"]: m
+        for m in movie_service.get_by_ids([tmdb for _, tmdb, _, _ in ranked])
+    }
+    result = []
+    for mid, tmdb, overlap, pop in ranked:
+        movie = movies_by_id.get(int(tmdb))
+        if not movie:
+            continue
+        movie["recommendationScore"] = round(overlap * 0.7 + pop * 0.3, 4)
+        movie["scoreComponents"] = {
+            "genreOverlap": overlap,
+            "popularity": round(pop, 4),
+            "final": round(overlap * 0.7 + pop * 0.3, 4),
+        }
+        movie["reason"] = f"Top rated in {', '.join(fav_genres[:3])}"
+        result.append(movie)
+
+    return result or movie_service.get_trending(limit=n)

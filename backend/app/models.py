@@ -38,6 +38,7 @@ class User(db.Model):
     # Preferences set during onboarding
     include_watched    = db.Column(db.Boolean, default=False)
     watching_frequency = db.Column(db.String(50), default="weekly")
+    _preferred_languages = db.Column("preferred_languages", db.Text, default='["en"]')
 
     # Optional mapping to a MovieLens userId in the training dataset.
     # Set this if you want to personalise recs using the trained hybrid model.
@@ -72,6 +73,14 @@ class User(db.Model):
     def watched_movies(self, value):
         self._watched_movies = json.dumps(value)
 
+    @property
+    def preferred_languages(self):
+        return json.loads(self._preferred_languages or '["en"]')
+
+    @preferred_languages.setter
+    def preferred_languages(self, value):
+        self._preferred_languages = json.dumps(value)
+
     # ── Serialisation ───────────────────────────────────────────────────────
 
     def to_dict(self):
@@ -86,6 +95,7 @@ class User(db.Model):
             "favoriteGenres": self.favorite_genres,
             "favoriteMovies": self.favorite_movies,
             "watchedMovies": self.watched_movies,
+            "preferredLanguages": self.preferred_languages,
             "preferences": {
                 "includeWatched": self.include_watched,
                 "watchingFrequency": self.watching_frequency,
