@@ -41,8 +41,23 @@ logger = logging.getLogger(__name__)
 _WORKSPACE = pathlib.Path(__file__).resolve().parents[2]
 
 # Allow env-var override for containerised deployments (e.g. MODELS_DIR=/workspace/models)
-MODELS_DIR    = pathlib.Path(_os.environ["MODELS_DIR"]) if _os.environ.get("MODELS_DIR") else _WORKSPACE / "models"
-PROCESSED_DIR = pathlib.Path(_os.environ.get("PROCESSED_DIR", "")) if _os.environ.get("PROCESSED_DIR") else _WORKSPACE / "data_science" / "processed"
+# Docker: _WORKSPACE resolves to "/" because parents[2] of /app/app/ml_service.py is /
+# so we fall back to well-known /workspace/* mount points when the derived path doesn't exist.
+_DOCKER_MODELS    = pathlib.Path("/workspace/models")
+_DOCKER_PROCESSED = pathlib.Path("/workspace/data_science/processed")
+
+def _resolve_dir(env_var: str, workspace_sub: str, docker_fallback: pathlib.Path) -> pathlib.Path:
+    if _os.environ.get(env_var):
+        return pathlib.Path(_os.environ[env_var])
+    default = _WORKSPACE / workspace_sub
+    if default.exists():
+        return default
+    if docker_fallback.exists():
+        return docker_fallback
+    return default
+
+MODELS_DIR    = _resolve_dir("MODELS_DIR",    "models",                      _DOCKER_MODELS)
+PROCESSED_DIR = _resolve_dir("PROCESSED_DIR", "data_science/processed",      _DOCKER_PROCESSED)
 
 # ── Hugging Face model download ──────────────────────────────────────────────
 HF_REPO_ID = "Skywalker1910/movie-rec-models"
