@@ -8,9 +8,9 @@ import { moviesAPI } from '../api/api';
 import { useAuth } from '../context/AuthContext';
 
 const SECTIONS = [
-  { key: 'recommended', title: 'Recommended for You',  accent: true },
-  { key: 'favorites',   title: 'Based on Your Favourites', accent: false },
-  { key: 'trending',    title: 'Trending Now',          accent: false },
+  { section: 'recommended', title: 'Recommended for You',  accent: true },
+  { section: 'favorites',   title: 'Based on Your Favourites', accent: false },
+  { section: 'trending',    title: 'Trending Now',          accent: false },
 ];
 
 function useRecs(section) {
@@ -98,7 +98,7 @@ export default function DashboardPage() {
           </h2>
         )}
         {SECTIONS.map(s => (
-          <RecSection key={s.key} {...s} />
+          <RecSection key={s.section} {...s} />
         ))}
       </div>
     </div>
